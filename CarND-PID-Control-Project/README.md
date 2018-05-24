@@ -2,12 +2,12 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
-##Describe the effect each of the P, I, D components had in your implementation.
+## Describe the effect each of the P, I, D components had in your implementation.
 * P: Proportional, which means a proportional to cross-track error (CET) term and determines the speed of the control system response as the ratio of output response (defined by weight Kp) to the CET signal.  The oscillation will increase if the value is too high. However, the steering angle will be too small and the toy car will hardly reach the trajectory when the value is too low.
 * I: Integral, which is proportional to both the magnitude of the CET and the duration of the CET and is defined by weight Ki. It counteracts a bias in the cross track error, which prevents the PD controller from reaching the center line
 * D: Differential, which is proportional to the rate of change of the CET. It considers the rate of change in the error, prevents overshooting the center line.
 
-##Describe how the final hyperparameters were chosen.
+## Describe how the final hyperparameters were chosen.
 * First, I manually chose the value of parameters Kp, Ki, Kd. Here are the experiments record:
 1. Tuning Kp, fix Ki=Kd=0
 Kp=1, turn right outside the road
