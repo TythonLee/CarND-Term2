@@ -24,11 +24,12 @@ void PID::Init(double Kp, double Ki, double Kd) {
 	PID::best_error = 100000000.0;// std::numeric_limits<double>::max();
 	PID::n = 1;
 
-	p = { Kp,Ki,Kd };
-	dp = { 0.2*Kp,0.2*Ki,0.2*Kd };
-	n_threshold = 100;
-	param_index = 0;
-	tried_adding = tried_subtracting = false;
+	PID::p = { Kp,Ki,Kd };
+	PID::dp = { 0.2*Kp,0.2*Ki,0.2*Kd };
+	PID::n_threshold = 100;
+	PID::param_index = 0;
+	PID::tried_adding = false;
+	PID::tried_subtracting = false;
 }
 
 void PID::UpdateError(double cte) {
@@ -36,7 +37,7 @@ void PID::UpdateError(double cte) {
 	this->d_error = cte - this->p_error;
 	this->p_error = cte;
 	this->i_error += cte;
-	
+	/*
 	if ( n % n_threshold==0 ){
 		total_square_error += cte * cte;
 		cout << "Times: ---" << n/100 << "---" << endl;
@@ -78,6 +79,7 @@ void PID::UpdateError(double cte) {
 
 	}
 	n++;
+	*/
 	
 }
 
