@@ -1,5 +1,152 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
+---
+
+## Model Predictive Control
+The [MPC](https://en.wikipedia.org/wiki/Model_predictive_control) is an advanced control technique for complex control problems. MPC is an optimization problem to find the best set of control inputs that minimizes the cost functions based on the prediction (dynamical) model. 
+It generally includes 7 steps:
+* 1. Set prediction horizon: N and dt.
+* 2. Fit the polynomial to the waypoints.
+* 3. Calculate initial cross track error and orientation error values.
+* 4. Define the components of the cost function (state, actuators, etc). 
+* 5. Define the model constraints. 
+* 6. Update states
+* 7. Deal with latency
+
+### 1. Set prediction horizon: N and dt
+The prediction horizon is the duration over which future predictions are made. We’ll refer to this as `T`. `T` is the product of two other variables, `N` and `dt`. `N` is the number of timesteps in the horizon. `dt` is how much time elapses between actuations. For example, if `N` were 20 and `dt` were 0.5, then `T` would be 10 seconds. `N`, `dt`, and `T` are hyperparameters you will need to tune for each model predictive controller you build. However, there are some general guidelines. `T` should be as large as possible, while `dt` should be as small as possible.
+In our model, `N` is set to be 10 and `dt =0.1` second.
+
+### 2. Fit the polynomial to the waypoints
+As we learned in the previous class, the trajectory is typically passed to the control block as a polynomial. This polynomial is usually 3rd order, since third order polynomials will fit trajectories for most roads. In our project, we try to: 
+1. Use `polyfit` to fit a 3rd order polynomial to the given `x` and `y` coordinates representing waypoints.
+2. Use `polyeval` to evaluate `y`values of given `x` coordinates.
+
+These two functions are defined as: 
+```
+// Evaluate a polynomial.
+double polyeval(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 0; i < coeffs.size(); i++) {
+    result += coeffs[i] * pow(x, i);
+  }
+  return result;
+}
+
+// Fit a polynomial.
+// Adapted from
+// https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
+Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) {
+  assert(xvals.size() == yvals.size());
+  assert(order >= 1 && order <= xvals.size() - 1);
+  Eigen::MatrixXd A(xvals.size(), order + 1);
+
+  for (int i = 0; i < xvals.size(); i++) {
+    A(i, 0) = 1.0;
+  }
+  for (int j = 0; j < xvals.size(); j++) {
+    for (int i = 0; i < order; i++) {
+      A(j, i + 1) = A(j, i) * xvals(j);
+    }
+  }
+  auto Q = A.householderQr();
+  auto result = Q.solve(yvals);
+  return result;
+}
+```
+### 3. Calculate initial cross track error and orientation error values
+
+Cross track error: We can express the error between the center of the road and the vehicle's position as the cross track error (CTE). The CTE of the successor state after time t is the state at t + 1, and is defined as:
+![](https://upload-images.jianshu.io/upload_images/6982894-99ee4e7525107ef3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+Orientation Error:
+![](https://upload-images.jianshu.io/upload_images/6982894-622a8bb8d1941aee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/400)
+
+### 4. Define the components of the cost function (state, actuators, etc)
+The cost includes three parts: state loss, actuators loss, gap between sequential actuations. The cost of a trajectory of length N is computed as follows:
+```
+ // The part of the cost based on the reference state.
+	  for (size_t t = 0; t < N; t++) {
+		  fg[0] += 8000 * CppAD::pow(vars[cte_start + t], 2);
+		  fg[0] += 8000 * CppAD::pow(vars[epsi_start + t], 2);
+		  fg[0] += 5 * CppAD::pow(vars[v_start + t] - ref_v, 2);
+	  }
+
+	  // Minimize the use of actuators.
+	  for (size_t t = 0; t < N - 1; t++) {
+		  fg[0] += 150 * CppAD::pow(vars[delta_start + t], 2);
+		  fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);
+	  }
+
+	  // Minimize the value gap between sequential actuations.
+	  for (size_t t = 0; t < N - 2; t++) {
+		  fg[0] += 5 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+		  fg[0] += 5 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+	  }
+```
+### 5. Define the model constraints. 
+The actuators constraints limits the upper and lower bounds of the steering angle and throttle acceleration/brake. In our project, we define the constraints as:
+```
+  // Lower and upper limits for x
+  Dvector vars_lowerbound(n_vars);
+  Dvector vars_upperbound(n_vars);
+  // TODO: Set lower and upper limits for variables.
+  // Set all non-actuators upper and lowerlimits
+  // to the max negative and positive values.
+  for (size_t i = 0; i < delta_start; i++) {
+	  vars_lowerbound[i] = -1.0e19;
+	  vars_upperbound[i] = 1.0e19;
+  }
+  // The upper and lower limits of delta are set to -25 and 25
+  // degrees (values in radians).
+  // NOTE: Feel free to change this to something else.
+  for (size_t i = delta_start; i < a_start; i++) {
+	  vars_lowerbound[i] = -0.436332;
+	  vars_upperbound[i] = 0.436332;
+  }
+
+  // Acceleration/decceleration upper and lower limits.
+  // NOTE: Feel free to change this to something else.
+  for (size_t i = a_start; i < n_vars; i++) {
+	  vars_lowerbound[i] = -1.0;
+	  vars_upperbound[i] = 1.0;
+  }
+
+  // Lower and upper limits for the constraints
+  // Should be 0 besides initial state.
+  Dvector constraints_lowerbound(n_constraints);
+  Dvector constraints_upperbound(n_constraints);
+  for (size_t i = 0; i < n_constraints; i++) {
+    constraints_lowerbound[i] = 0;
+    constraints_upperbound[i] = 0;
+  }
+```
+### 6. Update states
+After defining the cost and constraints, the states update as follows:
+![](https://upload-images.jianshu.io/upload_images/6982894-c000b0041da3171e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+`Lf` measures the distance between the front of the vehicle and its center of gravity. `f(x)` is the evaluation of the polynomial `f` at point `x` and `psidest` is the tangencial angle of the polynomial `f `evaluated at `x`.
+
+### 7. Deal with latency
+In a real car, an actuation command won't execute instantly - there will be a delay as the command propagates through the system. A realistic delay might be on the order of 100 milliseconds.
+This is a problem called "latency", and it's a difficult challenge for some controllers - like a PID controller - to overcome. But a Model Predictive Controller can adapt quite well because we can model this latency in the system.
+One approach would be running a simulation using the vehicle model starting from the current state for the duration of the latency. The resulting state from the simulation is the new initial state for MPC.
+In our project, we solved this problem by predicting the next state before calling the MPC solver. Here is the code:
+```
+//predict next state to avoid Latency problems
+		  //Latency of .1 seconds
+		  double dt = 0.1;
+		  const double Lf = 2.67;
+		  double x1 = 0, y1 = 0, psi1 = 0, v1 = v, cte1 = cte, epsi1 = epsi;
+		  x1 += v * cos(0) * dt;
+		  y1 += v * sin(0) * dt;
+		  //steer_value is negative
+		  psi1 += -v / Lf * steer_value * dt;
+		  v1 += throttle_value * dt;
+		  cte1 += v * sin(epsi1) * dt;
+		  //steer_value is negative
+		  epsi1 += -v * steer_value / Lf * dt;
+		  Eigen::VectorXd state(6);
+		  state << x1, y1, psi1, v1, cte1, epsi1;
+```
 
 ---
 
