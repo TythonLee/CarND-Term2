@@ -60,6 +60,7 @@ Cross track error: We can express the error between the center of the road and t
 ![](https://upload-images.jianshu.io/upload_images/6982894-99ee4e7525107ef3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 Orientation Error:
+
 ![](https://upload-images.jianshu.io/upload_images/6982894-622a8bb8d1941aee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/400)
 
 ### 4. Define the components of the cost function (state, actuators, etc)
