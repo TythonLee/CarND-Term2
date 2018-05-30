@@ -58,6 +58,7 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order)
 
 Cross track error: We can express the error between the center of the road and the vehicle's position as the cross track error (CTE). The CTE of the successor state after time t is the state at t + 1, and is defined as:
 ![](https://upload-images.jianshu.io/upload_images/6982894-99ee4e7525107ef3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
 Orientation Error:
 ![](https://upload-images.jianshu.io/upload_images/6982894-622a8bb8d1941aee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/400)
 
@@ -123,6 +124,7 @@ The actuators constraints limits the upper and lower bounds of the steering angl
 ### 6. Update states
 After defining the cost and constraints, the states update as follows:
 ![](https://upload-images.jianshu.io/upload_images/6982894-c000b0041da3171e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
 `Lf` measures the distance between the front of the vehicle and its center of gravity. `f(x)` is the evaluation of the polynomial `f` at point `x` and `psidest` is the tangencial angle of the polynomial `f `evaluated at `x`.
 
 ### 7. Deal with latency
